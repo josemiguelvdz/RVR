@@ -7,9 +7,13 @@
 #include <netdb.h>
 
 int main(int argc, char** argv){
-    // Leer argumentos
+    if (argc < 2)
+    {
+        std::cerr << "Invalid number of parameters. Usage: ejercicio1 <domainName>\n";
+        return -1;
+    }
+
     char* node = argv[1];
-    char* service = argv[2];
 
     struct addrinfo hints;
     struct addrinfo *result;
@@ -19,19 +23,18 @@ int main(int argc, char** argv){
     hints.ai_flags = AI_PASSIVE;
     hints.ai_family = AF_UNSPEC;
 
-    int nc = getaddrinfo(node, service, &hints, &result);
+    int nc = getaddrinfo(node, NULL, &hints, &result);
 
     if (nc != 0){
-        std::cerr << "Error: " << gai_strerror(nc) << "\n";
+        std::cerr << "getaddrinfo error: " << gai_strerror(nc) << "\n";
         return -1;
     }
 
     for(struct addrinfo* i = result; i != nullptr; i = i->ai_next){
         char host [NI_MAXHOST];
-        char server [NI_MAXSERV];
 
-        getnameinfo (i->ai_addr, i->ai_addrlen, host, NI_MAXHOST, server,
-        NI_MAXSERV, NI_NUMERICHOST);
+        getnameinfo (i->ai_addr, i->ai_addrlen, host, NI_MAXHOST, NULL,
+        0, NI_NUMERICHOST);
 
         std::cout << host << "\t" << i->ai_family << "\t" << i->ai_socktype << "\n";
     }
