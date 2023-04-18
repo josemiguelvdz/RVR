@@ -1,94 +1,114 @@
-#include <sys/types.h>
 #include <iostream>
-#include <stdlib.h>
-#include <arpa/inet.h>
+#include <cstring>
+#include <cstdlib>
+#include <ctime>
+#include <cstdio>
+#include <netinet/in.h>
+#include <sys/types.h>
 #include <sys/socket.h>
-#include <string.h>
 #include <netdb.h>
-#include <time.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
-int main(int argc, char** argv){
-    if (argc < 3) 
-    {
-        std::cerr << "Invalid number of parameters. Usage: ejercicio2 <IPAddress> <port>\n";
-        return -1;
+#define BUFFER_SIZE 256
+
+using namespace std;
+
+void get_time(char * buffer) {
+    time_t rawtime;
+    struct tm * timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(buffer, BUFFER_SIZE, "%r", timeinfo);
+}
+
+void get_date(char * buffer) {
+    time_t rawtime;
+    struct tm * timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(buffer, BUFFER_SIZE, "%F", timeinfo);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 3) {
+        cerr << "Uso: " << argv[0] << " <IPAddress> <port>" << endl;
+        exit(EXIT_FAILURE);
     }
 
-    char* node = argv[1];
-    char* service = argv[2];
+    char *ip_address = argv[1];
+    char *port = argv[2];
 
-    struct addrinfo hints;
-    struct addrinfo *result;
-
-    memset(&hints, 0, sizeof(struct addrinfo));
-
-    hints.ai_flags = AI_PASSIVE;
+    int status;
+    struct addrinfo hints, *res, *p;
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE;
 
-    int nc = getaddrinfo(node, service, &hints, &result);
-    
-    if (nc != 0){
-        std::cerr << "getaddrinfo error: " << gai_strerror(nc) << "\n";
-        return -1;
+    if ((status = getaddrinfo(ip_address, port, &hints, &res)) != 0) {
+        cerr << "Error en getaddrinfo: " << gai_strerror(status) << endl;
+        exit(EXIT_FAILURE);
     }
 
-    int sd = socket(result->ai_family, result->ai_socktype, 0);
-
-    if (bind(sd, (struct sockaddr*)result->ai_addr, result->ai_addrlen) != 0) {
-        std::cerr << "bind error\n";
-        return -1;
+    int sockfd;
+    for (p = res; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+            continue;
+        }
+        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+            close(sockfd);
+            continue;
+        }
+        break;
     }
-
-    char c = ' ';
-
-    const int size = 256;
-    char entryBuffer[size];
-    char exitBuffer[size];
-
-    ssize_t nBytes;
-
-    while(c != 'q') {
-        nBytes = recvfrom(sd, &entryBuffer, 80, 0, (struct sockaddr *) &cliente, &cliente_len);
-
-        entryBuffer[nBytes] = '\0';
-
-        c = entryBuffer[0];
-
-        switch (c)
-        {
-        case 't':
-        {
-            struct tm* timeInfo;
-            time_t timer = mktime(timeInfo);
-            localtime(&timer);
-            
-            strftime(&exitBuffer[0], size, "%T", timeInfo);
-        }
-            break;
-        case 'd':
-            {
-            struct tm* timeInfo;
-            time_t timer = mktime(timeInfo);
-            localtime(&timer);
-            
-            strftime(&exitBuffer[0], size, "%D", timeInfo);
-        }
-            break;
-        default:
-            break;
-        }
-
-        getnameinfo((struct sockaddr* ) &cliente, cliente_len, host, NI_MAXHOST, server, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV);
-
-        std::cout << "Conexion desde Host: " << host << "\t" << server << "\n";
-        std::cout << "\tMensaje" << nBytes << "\t" << exitBuffer << "\n";
-
-        exitBuffer[size] = '\0';
-        sendto(sd, &exitBuffer[0], nBytes, 0, (struct sockaddr *) &cliente, cliente_len);
+    if (p == NULL) {
+        cerr << "Error en bind" << endl;
+        exit(EXIT_FAILURE);
     }
+    freeaddrinfo(res);
 
-    freeaddrinfo(result);
+    cout << "Servidor escuchando en " << ip_address << ":" << port << endl;
 
-    return 0;
+    struct sockaddr_storage their_addr;
+    socklen_t addr_len = sizeof(their_addr);
+    char buffer[BUFFER_SIZE];
+    int numbytes;
+
+    while (true) {
+        numbytes = recvfrom(sockfd, buffer, BUFFER_SIZE-1, 0, (struct sockaddr *)&their_addr, &addr_len);
+        buffer[numbytes] = '\0';
+
+        char host[NI_MAXHOST];
+        char service[NI_MAXSERV];
+
+        int status = getnameinfo((struct sockaddr *)&their_addr, addr_len, host, NI_MAXHOST, service, NI_MAXSERV, 0);
+        if (status != 0) {
+            cerr << "Error en getnameinfo: " << gai_strerror(status) << endl;
+            continue;
+        }
+        cout << numbytes << " bytes de " << host << ":" << service << endl;
+if (buffer[0] == 't') {
+            get_time(buffer);
+        }
+        else if (buffer[0] == 'd') {
+            get_date(buffer);
+        }
+        else if
+        (buffer[0] == 'q') {
+        break;
+    }
+    else {
+        cout << "Comando no soportado " << buffer[0] << endl;
+        continue;
+    }
+    if ((numbytes = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&their_addr, addr_len)) == -1) {
+        cerr << "Error en sendto" << endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
+cout << "Saliendo..." << endl;
+close(sockfd);
+return 0;
 }
