@@ -40,24 +40,24 @@ int main(int argc, char *argv[]) {
     char *port = argv[2];
 
     int status;
-    struct addrinfo hints, *res, *p;
+    struct addrinfo hints, *result, *p;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE;
 
-    if ((status = getaddrinfo(ip_address, port, &hints, &res)) != 0) {
+    if ((status = getaddrinfo(ip_address, port, &hints, &result)) != 0) {
         cerr << "Error en getaddrinfo: " << gai_strerror(status) << endl;
         exit(EXIT_FAILURE);
     }
 
-    int sockfd;
-    for (p = res; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+    int socket_fd;
+    for (p = result; p != NULL; p = p->ai_next) {
+        if ((socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
             continue;
         }
-        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
+        if (bind(socket_fd, p->ai_addr, p->ai_addrlen) == -1) {
+            close(socket_fd);
             continue;
         }
         break;
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
         cerr << "Error en bind" << endl;
         exit(EXIT_FAILURE);
     }
-    freeaddrinfo(res);
+    freeaddrinfo(result);
 
     cout << "Servidor escuchando en " << ip_address << ":" << port << endl;
 
@@ -75,8 +75,9 @@ int main(int argc, char *argv[]) {
     char buffer[BUFFER_SIZE];
     int numbytes;
 
-    while (true) {
-        numbytes = recvfrom(sockfd, buffer, BUFFER_SIZE-1, 0, (struct sockaddr *)&their_addr, &addr_len);
+    bool quit = false;
+    while (!quit) {
+        numbytes = recvfrom(socket_fd, buffer, BUFFER_SIZE-1, 0, (struct sockaddr *)&their_addr, &addr_len);
         buffer[numbytes] = '\0';
 
         char host[NI_MAXHOST];
@@ -84,31 +85,31 @@ int main(int argc, char *argv[]) {
 
         int status = getnameinfo((struct sockaddr *)&their_addr, addr_len, host, NI_MAXHOST, service, NI_MAXSERV, 0);
         if (status != 0) {
-            cerr << "Error en getnameinfo: " << gai_strerror(status) << endl;
+            cerr << "Error en getnameinfo: " << gai_strerror(status) << "\n";
             continue;
         }
-        cout << numbytes << " bytes de " << host << ":" << service << endl;
-if (buffer[0] == 't') {
-            get_time(buffer);
-        }
-        else if (buffer[0] == 'd') {
-            get_date(buffer);
-        }
-        else if
-        (buffer[0] == 'q') {
-        break;
-    }
-    else {
-        cout << "Comando no soportado " << buffer[0] << endl;
-        continue;
-    }
-    if ((numbytes = sendto(sockfd, buffer, strlen(buffer), 0, (struct sockaddr *)&their_addr, addr_len)) == -1) {
-        cerr << "Error en sendto" << endl;
-        exit(EXIT_FAILURE);
-    }
-}
+        cout << numbytes << " bytes de " << host << ":" << service << "\n";
 
-cout << "Saliendo..." << endl;
-close(sockfd);
-return 0;
+        if (buffer[0] == 't')
+            get_time(buffer);
+        else if (buffer[0] == 'd') 
+            get_date(buffer);
+        else if (buffer[0] == 'q'){
+            quit = true;
+            sprintf(buffer, "Servidor apagado.");
+        }
+        else {
+            cout << "Comando no soportado " << buffer[0] << "\n";
+            sprintf(buffer, "Comando no soportado %c" , buffer[0]);
+        }
+
+        if ((numbytes = sendto(socket_fd, buffer, strlen(buffer), 0, (struct sockaddr *)&their_addr, addr_len)) == -1) {
+            cerr << "Error en sendto\n";
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    cout << "Saliendo...\n";
+    close(socket_fd);
+    return 0;
 }
