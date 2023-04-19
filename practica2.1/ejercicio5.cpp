@@ -52,16 +52,16 @@ int main(int argc, char** argv)
         memset(&exitBuffer, '0', sizeof(char) * size);
 
         std::cin >> exitBuffer;
-        if (!strcmp(exitBuffer, "q"))
+        bytes = send(sd, exitBuffer, strlen(exitBuffer), 0);
+
+        if(strcmp(exitBuffer, "Q") == 0)
             break;
 
-        bytes = send(sd, exitBuffer, strlen(exitBuffer) + 1, 0);
         if (bytes == -1)
         {
             std::cerr << "send error\n";
             return -1;
         }
-        exitBuffer[bytes] = '\0';
 
         char entryBuffer[size];
         memset(&entryBuffer, '0', size);
@@ -74,7 +74,7 @@ int main(int argc, char** argv)
         }
         entryBuffer[bytes] = '\0';
 
-        std::cout << entryBuffer;
+        std::cout << entryBuffer << "\n";
     }
 
     freeaddrinfo(result);

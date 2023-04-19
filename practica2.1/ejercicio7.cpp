@@ -7,6 +7,8 @@
 #include <thread>
 #include <memory>
 
+#define BUFFER_SIZE 256
+
 class ConnectionThread
 {
 public:
@@ -18,30 +20,24 @@ public:
 
     void thread_work()
     {
-        int size = 120;
-        char buffer[size];
-        memset(&buffer, '\0', sizeof(char) * size);
+        char buffer[BUFFER_SIZE];
+        memset(&buffer, '\0', BUFFER_SIZE);
 
         ssize_t bytes = -1;
         while (!thread_end)
         {
-            memset(&buffer, '0', sizeof(char) * size);
+            memset(&buffer, '0', BUFFER_SIZE);
+            bytes = recv(socket_descriptor, buffer, BUFFER_SIZE, 0);
 
-            // -- Apartado de recepcion del mensaje --
+            if (bytes == -1) return;
 
-            bytes = recv(socket_descriptor, buffer, (size - 1) * sizeof(char), 0);
-
-            if (bytes == -1) return; //Si se produce un error, simplemente se  ignora
-
-            if (bytes == 0) //Se comprueba si el numero de bytes es 0 para determinar si el cliente ha cerrado la conexion
+            if (bytes == 0)
             {
                 printf("Conexion terminada.\n");
                 return;
             }
 
             buffer[bytes] = '\0';
-
-            // --Apartado de respuesta del servidor--
 
             bytes = send(socket_descriptor, buffer, bytes, 0);
 
@@ -61,35 +57,36 @@ private:
 
 int main(int argc, char** argv)
 {
-    if (argc != 3)
+    if (argc < 3)
     {
-        printf("Numero de argumentos no valido\n");
+        std::cerr << "Invalid number of parameters. Usage: ejercicio6 <IPAddress> <port>\n";
         return -1;
     }
+    
+    char *ip_address = argv[1];
+    char *port = argv[2];
 
-    struct addrinfo hints;
-    struct addrinfo* result;
+    int status;
+    struct addrinfo hints, *result, *p;
 
-    memset(&hints, 0, sizeof(struct addrinfo));
+    memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE;
 
-    int rc = getaddrinfo(argv[1], argv[2], &hints, &result);
-
-    if (rc != 0)
-    {
-        std::cerr << "getaddinfo error: " << gai_strerror(rc) << "\n";
-        return -1;
+    if ((status = getaddrinfo(ip_address, port, &hints, &result)) != 0) {
+        std::cerr << "Error en getaddrinfo: " << gai_strerror(status) << "\n";
+        exit(EXIT_FAILURE);
     }
 
     int sd = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-
     if (bind(sd, result->ai_addr, result->ai_addrlen) != 0)
     {
-        std::cerr << "bind error\n";
-        return -1;
+        std::cerr << "Error en bind\n";
+        exit(EXIT_FAILURE);
     }
+
+    std::cout << "Server listening on " << ip_address << ":" << port << std::endl;
 
     if (listen(sd, 16) == -1)
     {
@@ -116,8 +113,6 @@ int main(int argc, char** argv)
         getnameinfo(&client_addr, client_len, host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV);
 
         printf("Conexion desde %s %s\n", host, service);
-
-        // -- Apartado de creacion del hilo --
 
         std::shared_ptr<ConnectionThread> connection(new ConnectionThread(sd));
 
