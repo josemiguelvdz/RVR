@@ -6,6 +6,8 @@
 
 #include <iostream>
 
+#define BUFFER_SIZE 256
+
 int main(int argc, char** argv)
 {
     if (argc < 3)
@@ -14,8 +16,8 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    char* node = argv[1];
-    char* service = argv[2];
+    char *ip_address = argv[1];
+    char *port = argv[2];
 
     struct addrinfo hints;
     struct addrinfo* result;
@@ -26,7 +28,7 @@ int main(int argc, char** argv)
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
-    int nc = getaddrinfo(node, service, &hints, &result);
+    int nc = getaddrinfo(ip_address, port, &hints, &result);
 
     if (nc != 0)
     {
@@ -42,14 +44,14 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    int size = 256;
-    char entryBuffer[size];
-    char exitBuffer[size];
+
+    char entryBuffer[BUFFER_SIZE];
+    char exitBuffer[BUFFER_SIZE];
 
     ssize_t bytes = -1;
     while (1)
     {
-        memset(&exitBuffer, '0', sizeof(char) * size);
+        memset(&exitBuffer, '0', sizeof(char) * BUFFER_SIZE);
 
         std::cin >> exitBuffer;
         bytes = send(sd, exitBuffer, strlen(exitBuffer), 0);
@@ -63,9 +65,9 @@ int main(int argc, char** argv)
             return -1;
         }
 
-        char entryBuffer[size];
-        memset(&entryBuffer, '0', size);
-        bytes = recv(sd, entryBuffer, (size - 1) * sizeof(char), 0);
+        char entryBuffer[BUFFER_SIZE];
+        memset(&entryBuffer, '0', BUFFER_SIZE * sizeof(char));
+        bytes = recv(sd, entryBuffer, (BUFFER_SIZE - 1) * sizeof(char), 0);
 
         if (bytes == -1)
         {

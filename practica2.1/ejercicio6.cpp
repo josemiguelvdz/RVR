@@ -29,38 +29,31 @@ void get_date(char * buffer) {
     strftime(buffer, BUFFER_SIZE, "%F", timeinfo);
 }
 
-class MessageThread
+class ThreadListener
 {
 public:
-    bool thread_end;
+    bool quit;
 
-    MessageThread(int socket_descriptor) : sd(socket_descriptor), thread_end(false) {}
+    ThreadListener(int sd_) : sd(sd_), quit(false) {}
 
-    ~MessageThread() {
-        thread_end = true;
+    ~ThreadListener() {
     }
 
-    void thread_work()
+    void thread_main()
     {
         char entryBuffer[BUFFER_SIZE];
-        memset(&entryBuffer, '0', BUFFER_SIZE);
+        memset(&entryBuffer, '0', BUFFER_SIZE * sizeof(char));
 
-        while (!thread_end)
+        while (!quit)
         {
             struct sockaddr client_addr;
             socklen_t client_len = sizeof(struct sockaddr);
 
-            memset(&entryBuffer, '0', BUFFER_SIZE);
+            memset(&entryBuffer, '0', BUFFER_SIZE * sizeof(char));
 
-            ssize_t bytes = recvfrom(sd, entryBuffer, (BUFFER_SIZE - 1) * sizeof(char), 0, &client_addr, &client_len);
+            ssize_t bytes = recvfrom(sd, entryBuffer, (BUFFER_SIZE - 1) * sizeof(char), MSG_DONTWAIT, &client_addr, &client_len);
 
-            if (bytes == 1)
-                continue;
-            else if (bytes == -1) {
-                std::cerr << "Error en recv.\n";
-                thread_end = true;
-                continue;
-            }
+            if (bytes == -1) continue;
 
             entryBuffer[bytes] = '\0';
 
@@ -83,14 +76,10 @@ public:
 
             if (entryBuffer[0] == 't')
                 get_time(exitBuffer);
-                
             else if (entryBuffer[0] == 'd')
                 get_date(exitBuffer);
-
-            else if (entryBuffer[0] == 'q'){
-                thread_end = true;
+            else
                 continue;
-            }
                 
             sendto(sd, exitBuffer, strlen(exitBuffer), 0, &client_addr, client_len);
 
@@ -137,30 +126,29 @@ int main(int argc, char** argv)
     std::cout << "Server listening on " << ip_address << ":" << port << std::endl;
 
     std::vector<std::thread> threads;
-    std::vector<MessageThread*> msgThreads;
+    std::vector<ThreadListener*> msgThreads;
 
-    std::cout << "Creando los hilos...\n";
     for (int i = 0; i < N_THREADS; i++)
     {
-        std::shared_ptr<MessageThread> threadsManager(new MessageThread(sd));
-        threads.push_back(std::thread(&MessageThread::thread_work, threadsManager));
+        std::shared_ptr<ThreadListener> threadsManager(new ThreadListener(sd));
+        threads.push_back(std::thread(&ThreadListener::thread_main, threadsManager));
         msgThreads.push_back(threadsManager.get());
         std::cout << "Hilo creado | Thread_id: " << threads[i].get_id() << "\n";
     }
 
     std::string user_input = "";
-    while (strcmp(user_input.c_str(), "q")) {
+    while(strcmp(user_input.c_str(), "q")){
         std::cin >> user_input;
     }
 
     for (int i = 0; i < N_THREADS; i++)
     {
         std::thread::id id = threads[i].get_id();
-        msgThreads[i]->thread_end = true;
+        msgThreads[i]->quit = true;
         threads[i].join();
         std::cout << "Hilo cerrado | Thread_id: " << id << "\n";
     }
-
+    
     freeaddrinfo(result);
 
     return 0;

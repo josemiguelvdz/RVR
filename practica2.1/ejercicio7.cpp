@@ -7,52 +7,50 @@
 #include <thread>
 #include <memory>
 
+#define N_THREADS 3
 #define BUFFER_SIZE 256
 
-class ConnectionThread
+class ThreadListener
 {
 public:
-    ConnectionThread(int socket_descriptor) : socket_descriptor(socket_descriptor), thread_end(false) {}
+    ThreadListener(int sd_) : sd(sd_) {}
 
-    ~ConnectionThread() {
-        thread_end = true;
+    ~ThreadListener() {
     }
 
-    void thread_work()
+    void thread_main()
     {
-        char buffer[BUFFER_SIZE];
-        memset(&buffer, '\0', BUFFER_SIZE);
+        char entryBuffer[BUFFER_SIZE];
+        memset(&entryBuffer, '\0', BUFFER_SIZE);
 
-        ssize_t bytes = -1;
-        while (!thread_end)
+        while (true)
         {
-            memset(&buffer, '0', BUFFER_SIZE);
-            bytes = recv(socket_descriptor, buffer, BUFFER_SIZE, 0);
+            memset(&entryBuffer, '0', BUFFER_SIZE);
+            ssize_t entryBytes = recv(sd, entryBuffer, BUFFER_SIZE, 0);
 
-            if (bytes == -1) return;
-
-            if (bytes == 0)
-            {
-                printf("Conexion terminada.\n");
-                return;
+            if (entryBytes == 0) {
+                std::cout << "Conexion terminada\n";
+                break;
+            }
+            else if (entryBytes < 0) {
+                continue;
             }
 
-            buffer[bytes] = '\0';
+            entryBuffer[entryBytes] = '\0';
 
-            bytes = send(socket_descriptor, buffer, bytes, 0);
+            ssize_t sendBytes = send(sd, entryBuffer, entryBytes, 0);
 
-            if (bytes == -1)
+            if (sendBytes == -1)
             {
                 std::cerr << "Error en la llamada a la funcion send." << std::endl;
-                return;
+                continue;
             }
+
             sleep(3);
         }
     }
-
 private:
-    int socket_descriptor;
-    bool thread_end;
+    int sd;
 };
 
 int main(int argc, char** argv)
@@ -67,7 +65,7 @@ int main(int argc, char** argv)
     char *port = argv[2];
 
     int status;
-    struct addrinfo hints, *result, *p;
+    struct addrinfo hints, *result;
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -88,7 +86,7 @@ int main(int argc, char** argv)
 
     std::cout << "Server listening on " << ip_address << ":" << port << std::endl;
 
-    if (listen(sd, 16) == -1)
+    if (listen(sd, N_THREADS) == -1)
     {
         std::cerr << "listen error\n";
         return -1;
@@ -99,28 +97,21 @@ int main(int argc, char** argv)
         struct sockaddr client_addr;
         socklen_t client_len = sizeof(struct sockaddr);
 
-        int sd = accept(sd, &client_addr, &client_len);
+        int threadSocket = accept(sd, &client_addr, &client_len);
 
-        if (sd == -1)
-        {
-            std::cerr << "accept error" << std::endl;
-            return -1;
-        }
+        if (threadSocket == -1)
+            continue;
 
         char host[NI_MAXHOST];
         char service[NI_MAXSERV];
 
         getnameinfo(&client_addr, client_len, host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICHOST | NI_NUMERICSERV);
-
-        printf("Conexion desde %s %s\n", host, service);
-
-        std::shared_ptr<ConnectionThread> connection(new ConnectionThread(sd));
-
-        std::thread thread(&ConnectionThread::thread_work, connection);
+        std::cout << "Conexion con " << host << " " << service << "\n";
+        std::shared_ptr<ThreadListener> connection(new ThreadListener(threadSocket));
+        std::thread thread(&ThreadListener::thread_main, connection);
         thread.detach();
     }
 
     freeaddrinfo(result);
-
     return 0;
 }
