@@ -73,8 +73,9 @@ int main(int argc, char** argv)
 
             bytes = recv(client_socket, buffer, size, 0);
 
-            if (bytes == 0) {
+            if (bytes == 0 || (bytes == 1 && buffer[0] == 'Q')) {
                 std::cout << "Conexion terminada\n";
+                bytes = 0;
                 continue;
             }
             else if (bytes == -1) {
