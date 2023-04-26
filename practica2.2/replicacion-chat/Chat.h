@@ -29,7 +29,7 @@ class ChatMessage: public Serializable
 public:
     static const size_t MESSAGE_SIZE = sizeof(char) * 88 + sizeof(uint8_t);
 
-    enum MessageType
+    enum MessageType : uint8_t
     {
         LOGIN   = 0,
         MESSAGE = 1,
@@ -38,7 +38,9 @@ public:
 
     ChatMessage(){};
 
-    ChatMessage(const std::string& n, const std::string& m):nick(n),message(m){};
+    ChatMessage(const std::string& n, const std::string& m):nick(n),message(m){
+        std::cout << "Mensaje creado. nick: " << nick << " message: " << message << "\n";
+    };
 
     void to_bin();
 
@@ -61,6 +63,7 @@ class ChatServer
 public:
     ChatServer(const char * s, const char * p): socket(s, p)
     {
+        std::cout << "Chat server\n";
         socket.bind();
     };
 
