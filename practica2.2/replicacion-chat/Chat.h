@@ -39,7 +39,6 @@ public:
     ChatMessage(){};
 
     ChatMessage(const std::string& n, const std::string& m):nick(n),message(m){
-        std::cout << "Mensaje creado. nick: " << nick << " message: " << message << "\n";
     };
 
     void to_bin();
@@ -63,7 +62,6 @@ class ChatServer
 public:
     ChatServer(const char * s, const char * p): socket(s, p)
     {
-        std::cout << "Chat server\n";
         socket.bind();
     };
 

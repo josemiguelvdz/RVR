@@ -40,20 +40,16 @@ int Socket::recv(Serializable &obj, Socket * &sock)
 
     char buffer[MAX_MESSAGE_SIZE];
 
-std::cout << "1\n";
     ssize_t bytes = ::recvfrom(sd, buffer, MAX_MESSAGE_SIZE, 0, &sa, &sa_len);
 
     if ( bytes <= 0 )
         return -1;
 
-std::cout << "2\n";
     if ( sock != 0 )
-    {
         sock = new Socket(&sa, sa_len);
-    }
-std::cout << buffer << " 3\n";
+
     obj.from_bin(buffer);
-std::cout << "4\n";
+
     return 0;
 }
 
@@ -62,8 +58,8 @@ int Socket::send(Serializable& obj, const Socket& sock)
     //Serializar el objeto
     //Enviar el objeto binario a sock usando el socket sd
     obj.to_bin();
-    std::cout << "Send " << obj.data() << "\n";
-    sendto(sock.sd, obj.data(), strlen(obj.data()), 0, &sock.sa, sock.sa_len);
+    sendto(sd, obj.data(), obj.size(), 0, &sock.sa, sock.sa_len);
+    return 0;
 }
 
 bool operator== (const Socket &s1, const Socket &s2)
